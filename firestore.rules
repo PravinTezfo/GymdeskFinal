@@ -1,0 +1,119 @@
+rules_version = '2';
+
+// GymDesk CRM rules.
+//
+// !!! GymFo (the Flutter member/trainer app) shares this Firebase project. Its blocks
+// !!! (accounts/{uid}, gyms/{gymId}/assigned_workouts, gyms/{gymId}/workout_logs and the
+// !!! member/trainer read access that goes through accounts/{uid}) must be MERGED into this file
+// !!! before deploying; deploying this file alone removes GymFo's access.
+//
+// Principles
+//  * Role documents (superadmins/admins/trainers) can NEVER be created or promoted by the client
+//    that owns them. Admin and trainer documents are created by a superadmin / gym admin; the first
+//    superadmin is created once in the Firebase console.
+//  * "Is this person an admin?" always checks the ROLE collection, never just "has a gym id".
+//  * Functions only use `let` + a single `return`, and always `exists()` before `get()`.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isSuperAdmin() {
+      return signedIn() && exists(/databases/$(database)/documents/superadmins/$(request.auth.uid));
+    }
+
+    function isAdminOf(gymId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+        && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.assignedGymId == gymId;
+    }
+
+    function isTrainerOf(gymId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/trainers/$(request.auth.uid))
+        && get(/databases/$(database)/documents/trainers/$(request.auth.uid)).data.assignedGymId == gymId;
+    }
+
+    function isStaffOf(gymId) {
+      return isAdminOf(gymId) || isTrainerOf(gymId);
+    }
+
+    // Fields a user may NOT change on their own profile document.
+    function keepsIdentity() {
+      return request.resource.data.role == resource.data.role
+        && request.resource.data.assignedGymId == resource.data.assignedGymId;
+    }
+
+    // ---- Public, non-sensitive branding (login screen logo). Written by the superadmin's settings form.
+    match /public/{docId} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
+
+    // ---- Super admins. Created manually in the console; they can edit their own profile/theme only.
+    match /superadmins/{userId} {
+      allow get: if signedIn() && (request.auth.uid == userId || isSuperAdmin());
+      allow list: if isSuperAdmin();
+      allow update: if signedIn() && request.auth.uid == userId
+                    && request.resource.data.role == 'superadmin';
+      allow create, delete: if false;
+    }
+
+    // ---- Gym admins. Created together with their gym by a superadmin.
+    match /admins/{userId} {
+      allow get: if signedIn() && (request.auth.uid == userId || isSuperAdmin());
+      allow list: if isSuperAdmin();
+      allow create, delete: if isSuperAdmin();
+      allow update: if isSuperAdmin()
+                    || (signedIn() && request.auth.uid == userId && keepsIdentity());
+    }
+
+    // ---- Trainers. Created by their gym's admin (or a superadmin).
+    match /trainers/{trainerId} {
+      allow get: if signedIn() && (request.auth.uid == trainerId
+                    || isSuperAdmin()
+                    || isAdminOf(resource.data.assignedGymId));
+      allow list: if isSuperAdmin()
+                  || (signedIn() && isAdminOf(resource.data.assignedGymId));
+      allow create: if request.resource.data.role == 'trainer'
+                    && (isSuperAdmin() || isAdminOf(request.resource.data.assignedGymId));
+      allow update: if isSuperAdmin()
+                    || (isAdminOf(resource.data.assignedGymId) && keepsIdentity())
+                    || (signedIn() && request.auth.uid == trainerId && keepsIdentity());
+      allow delete: if isSuperAdmin() || isAdminOf(resource.data.assignedGymId);
+    }
+
+    // ---- Gyms
+    match /gyms/{gymId} {
+      allow get: if isSuperAdmin() || isStaffOf(gymId);
+      allow list: if isSuperAdmin();
+      allow create, delete: if isSuperAdmin();
+      // A gym admin may edit the name/theme, but not `active`, `adminId`, etc.
+      allow update: if isSuperAdmin()
+                    || (isAdminOf(gymId)
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'theme']));
+
+      match /schemes/{schemeId} {
+        allow read: if isSuperAdmin() || isStaffOf(gymId);
+        allow write: if isSuperAdmin() || isAdminOf(gymId);
+      }
+
+      match /members/{memberId} {
+        allow read: if isSuperAdmin() || isStaffOf(gymId);
+        allow write: if isAdminOf(gymId);
+      }
+
+      match /members_log/{logId} {
+        allow read: if isSuperAdmin() || isStaffOf(gymId);
+        allow write: if isAdminOf(gymId);
+      }
+
+      match /expenses/{expenseId} {
+        allow read, write: if isAdminOf(gymId);
+      }
+    }
+  }
+}

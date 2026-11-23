@@ -1,0 +1,169 @@
+
+{
+  "entities": {
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
+      "type": "object",
+      "description": "Represents a user in the system, who can be a superadmin or an admin.",
+      "properties": {
+        "uid": { "type": "string", "description": "Unique identifier (matches Firebase Auth UID)." },
+        "email": { "type": "string", "format": "email" },
+        "firstname": { "type": "string" },
+        "lastname": { "type": "string" },
+        "role": { "type": "string", "enum": ["superadmin", "admin", "trainer"] },
+        "assignedGymId": { "type": ["string", "null"], "description": "The ID of the gym this user manages (if they are an admin or trainer)." }
+      },
+      "required": ["uid", "email", "firstname", "lastname", "role"]
+    },
+    "Gym": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Gym",
+      "type": "object",
+      "description": "Represents a single gym location.",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "logoUrl": { "type": "string", "format": "uri" },
+        "active": { "type": "boolean" },
+        "adminId": { "type": "string", "description": "The UID of the admin for this gym."},
+        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp when the gym was created." },
+        "theme": {
+          "type": "object",
+          "description": "Gym-specific theme settings.",
+          "properties": {
+            "logoUrl": { "type": "string", "format": "uri" },
+            "background": { "type": "string", "description": "HSL color string" },
+            "primary": { "type": "string", "description": "HSL color string for buttons" },
+            "sidebarBackground": { "type": "string", "description": "HSL color string" },
+            "sidebarActive": { "type": "string", "description": "HSL color string for active link background" },
+            "sidebarForeground": { "type": "string", "description": "HSL color string for active link text" },
+            "sidebarMutedForeground": { "type": "string", "description": "HSL color string for inactive link text" },
+            "card": { "type": "string", "description": "HSL color string for table/form backgrounds" },
+            "cardForeground": { "type": "string", "description": "HSL color string for table/form text" },
+            "border": { "type": "string", "description": "HSL color string for table/form borders" }
+          }
+        }
+      },
+      "required": ["id", "name", "active", "adminId", "createdAt"]
+    },
+    "Scheme": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Scheme",
+      "type": "object",
+      "description": "Represents a membership scheme for a gym.",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "price": { "type": "number" },
+        "durationValue": { "type": "number" },
+        "durationType": { "type": "string", "enum": ["months", "year"] }
+      },
+      "required": ["id", "name", "price", "durationValue", "durationType"]
+    },
+    "Member": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Member",
+      "type": "object",
+      "description": "Represents a member of a specific gym.",
+      "properties": {
+        "allLogId": { "type": "array", "items": { "type": "string" }, "description": "Array of all log IDs for this member." },
+        "activeLogId": { "type": "string", "description": "The ID of the currently active log entry." }
+      },
+      "required": ["activeLogId"]
+    },
+    "MemberLog": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "MemberLog",
+      "type": "object",
+      "description": "Represents a historical log entry for a member's activity or payment.",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "amountPaid": { "type": "number" },
+        "balanceAmount": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "discount": { "type": "number" },
+        "endDate": { "type": "string", "format": "date" },
+        "isDeleted": { "type": "boolean" },
+        "memberId": { "type": "string" },
+        "membershipType": { "type": "string" },
+        "paymentStatus": { "type": "string", "enum": ["Paid", "Partially Paid", "Not Paid"] },
+        "startDate": { "type": "string", "format": "date" }
+      },
+      "required": ["id", "memberId", "createdAt", "amountPaid", "paymentStatus", "startDate", "endDate", "membershipType"]
+    },
+    "Expense": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Expense",
+      "type": "object",
+      "description": "Represents a single expense entry for a gym.",
+      "properties": {
+        "id": { "type": "string" },
+        "category": { "type": "string", "enum": ["waterbill", "eb bill", "rent", "equipment service", "new equipment", "other"] },
+        "otherCategoryName": { "type": "string", "description": "Name for the category if 'other' is selected." },
+        "description": { "type": "string" },
+        "amount": { "type": "number" },
+        "date": { "type": "string", "format": "date" },
+        "gymId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "category", "description", "amount", "date", "gymId", "createdAt"]
+    },
+    "Trainer": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Trainer",
+      "type": "object",
+      "description": "Represents a trainer/instructor at a specific gym. This is a type of user.",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "firstname": { "type": "string" },
+        "lastname": { "type": "string" },
+        "phone": { "type": "string" },
+        "address": { "type": "string" },
+        "role": { "type": "string", "enum": ["trainer"] },
+        "assignedGymId": { "type": "string", "description": "The ID of the gym this trainer is assigned to." }
+      },
+      "required": ["uid", "email", "firstname", "lastname", "address", "role", "assignedGymId"]
+    }
+  },
+  "auth": {
+    "providers": ["password"]
+  },
+  "firestore": {
+    "/superadmins/{superadminId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "Stores super administrator user data."
+    },
+    "/admins/{adminId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "Stores gym administrator user data."
+    },
+     "/trainers/{trainerId}": {
+      "schema": { "$ref": "#/entities/Trainer" },
+      "description": "Stores trainer user data."
+    },
+    "/gyms/{gymId}": {
+      "schema": { "$ref": "#/entities/Gym" },
+      "description": "Stores all gym locations."
+    },
+    "/gyms/{gymId}/schemes/{schemeId}": {
+      "schema": { "$ref": "#/entities/Scheme" },
+      "description": "Stores membership schemes for a specific gym."
+    },
+    "/gyms/{gymId}/members/{memberId}": {
+      "schema": { "$ref": "#/entities/Member" },
+      "description": "Stores all members for a specific gym."
+    },
+    "/gyms/{gymId}/members_log/{logId}": {
+      "schema": { "$ref": "#/entities/MemberLog" },
+      "description": "Stores historical activity and payment logs for members of a specific gym."
+    },
+    "/gyms/{gymId}/expenses/{expenseId}": {
+      "schema": { "$ref": "#/entities/Expense" },
+      "description": "Stores all expense records for a specific gym."
+    }
+  }
+}
